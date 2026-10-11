@@ -1,8 +1,12 @@
-/** Types for the mock API (see ASSIGNMENT.md). Verified against the running API. */
 
-export type EventStatus = "ok" | "blocked" | "error";
+export const EVENT_STATUSES = ["ok", "blocked", "error"] as const;
 
-/** One row of GET /events. */
+export type EventStatus = (typeof EVENT_STATUSES)[number];
+
+export function isEventStatus(value: unknown): value is EventStatus {
+  return typeof value === "string" && (EVENT_STATUSES as readonly string[]).includes(value);
+}
+
 export interface EventSummary {
   id: string;
   /** ISO 8601, UTC. */
@@ -11,31 +15,21 @@ export interface EventSummary {
   tool: string;
   status: EventStatus;
   latencyMs: number;
-  argsPreview: string;
+  argsPreview?: string;
 }
 
-/** GET /events. `nextCursor` is null on the last page. */
 export interface EventsPage {
   items: EventSummary[];
   nextCursor: string | null;
   total: number;
 }
 
-/** GET /events/:id. Note: no `argsPreview`; `args` and `result` can be any JSON value. */
 export interface EventDetail extends Omit<EventSummary, "argsPreview"> {
   args: unknown;
   result: unknown;
-  /** Names of the policy rules that fired. */
   policyMatches: string[];
 }
 
-/** GET /events/histogram. Empty buckets are omitted. */
-export interface HistogramResponse {
-  bucket: "1m" | "5m" | "1h";
-  buckets: { t: string; count: number }[];
-}
-
-/** Query params accepted by GET /events (and, minus cursor/limit, the histogram). */
 export interface EventsQuery {
   q?: string;
   agent?: string[];
@@ -45,3 +39,5 @@ export interface EventsQuery {
   cursor?: string;
   limit?: number;
 }
+
+export type EventFilters = Pick<EventsQuery, "q" | "agent" | "status">;
