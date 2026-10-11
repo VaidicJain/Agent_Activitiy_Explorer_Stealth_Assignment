@@ -84,3 +84,18 @@ export function closeEvent() {
 export function readQueryFromLocation(): string {
   return parseEventsUrl(new URLSearchParams(window.location.search)).filters.q ?? "";
 }
+
+export type DashboardView = "explorer" | "live";
+
+/** `?view=live` selects the live stream; anything else is the explorer, so existing URLs keep working. */
+export function parseView(params: ParamsReader): DashboardView {
+  return params.get("view") === "live" ? "live" : "explorer";
+}
+
+/** Only touches `view`, so the explorer's filters and event selection stay in the URL. */
+export function setView(view: DashboardView) {
+  updateUrl((params) => {
+    if (view === "live") params.set("view", "live");
+    else params.delete("view");
+  }, "push");
+}

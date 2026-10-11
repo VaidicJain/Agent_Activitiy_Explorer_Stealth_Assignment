@@ -14,16 +14,15 @@ import {
   paginationForScope,
 } from "../pagination";
 import { eventsQueryOptions } from "../queries";
-import { closeEvent, openEvent, parseEventsUrl, updateFilters } from "../url-state";
-import { EventDetailPanel } from "./event-detail-panel";
+import { openEvent, parseEventsUrl, updateFilters } from "../url-state";
 import { EventsEmpty, EventsError, RefreshFailed, SlowNotice } from "./events-states";
 import { EventsTable } from "./events-table";
 import { EventsToolbar } from "./events-toolbar";
 import { PaginationControls } from "./pagination-controls";
 
 export function Explorer() {
-  // The URL holds the committed filters and the selected event; nothing here copies them.
-  const { filters, eventId } = parseEventsUrl(useSearchParams());
+  // The URL holds the committed filters; nothing here copies them.
+  const { filters } = parseEventsUrl(useSearchParams());
   const scope = JSON.stringify(filters);
 
   // Cursor history is local, but only valid for the filters it was built under. Comparing scopes
@@ -102,8 +101,6 @@ export function Explorer() {
         onNext={() => nextCursor && setPagination(goToNextPage(pagination, nextCursor))}
         onPageSizeChange={(pageSize) => setPagination(changePageSize(pagination, pageSize))}
       />
-
-      <EventDetailPanel eventId={eventId} onClose={closeEvent} />
     </>
   );
 }

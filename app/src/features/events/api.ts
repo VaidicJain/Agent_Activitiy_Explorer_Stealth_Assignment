@@ -64,7 +64,8 @@ function parseEventBase(value: Record<string, unknown>): Omit<EventSummary, "arg
   return { id, timestamp, agent, tool, status, latencyMs };
 }
 
-function parseEvent(value: unknown): EventSummary {
+/** Also used for events arriving over the live stream, which have the list-item shape. */
+export function parseEvent(value: unknown): EventSummary {
   if (!isRecord(value)) throw invalidResponse();
   const { argsPreview } = value;
   return {
