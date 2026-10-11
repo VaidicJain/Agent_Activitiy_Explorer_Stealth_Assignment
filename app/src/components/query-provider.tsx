@@ -14,6 +14,9 @@ function createQueryClient() {
         retry: (failureCount, error) =>
           error instanceof ApiError && error.retryable && failureCount < MAX_RETRIES,
         retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+        // Run the request even when the browser reports offline: otherwise TanStack Query pauses it
+        // silently and the user sees skeleton rows forever instead of a clear error with Retry.
+        networkMode: "always",
         staleTime: 30_000,
         refetchOnWindowFocus: false,
       },

@@ -1,54 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useDebounce } from "@/lib/use-debounce";
 import { formatCount } from "../format";
-import { isEventStatus, type EventFilters, EVENT_STATUSES } from "../types";
+import { EVENT_STATUSES, isEventStatus, type EventFilters } from "../types";
 import { readQueryFromLocation } from "../url-state";
 import { AgentFilter } from "./agent-filter";
 import { controlClass as control } from "./control-class";
 
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 400;
 const SEARCH_CLASS = `${control} min-w-64 flex-1 sm:max-w-md`;
 
-function createDebouncer(delayMs: number) {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  return {
-    run(callback: () => void) {
-      clearTimeout(timer);
-      timer = setTimeout(callback, delayMs);
-    },
-    cancel() {
-      clearTimeout(timer);
-    },
-  };
-}
-
 interface SearchBoxProps {
-  /** Text from the URL at mount (deep link or refresh). */
   initialValue: string;
   onCommit: (query: string | undefined) => void;
 }
 
-/**
- * The input keeps its own draft so typing is never delayed; only the debounced commit reaches
- * the URL (and therefore the query). The draft is resynced on Back/Forward, the only time the URL
- * changes the search text from outside this input.
- */
+
 function SearchBox({ initialValue, onCommit }: SearchBoxProps) {
   const [draft, setDraft] = useState(initialValue);
-  const [debouncer] = useState(() => createDebouncer(SEARCH_DEBOUNCE_MS));
+  const { run: commit, cancel: cancelCommit } = useDebounce(
+    (query: string) => onCommit(query.trim() || undefined),
+    SEARCH_DEBOUNCE_MS,
+  );
 
   useEffect(() => {
     function resync() {
-      debouncer.cancel();
+      cancelCommit();
       setDraft(readQueryFromLocation());
     }
     window.addEventListener("popstate", resync);
-    return () => {
-      window.removeEventListener("popstate", resync);
-      debouncer.cancel();
-    };
-  }, [debouncer]);
+    return () => window.removeEventListener("popstate", resync);
+  }, [cancelCommit]);
 
   return (
     <input
@@ -57,9 +40,8 @@ function SearchBox({ initialValue, onCommit }: SearchBoxProps) {
       placeholder="Search agent, tool or arguments…"
       value={draft}
       onChange={(event) => {
-        const next = event.target.value;
-        setDraft(next);
-        debouncer.run(() => onCommit(next.trim() || undefined));
+        setDraft(event.target.value);
+        commit(event.target.value);
       }}
       className={SEARCH_CLASS}
     />
@@ -69,7 +51,10 @@ function SearchBox({ initialValue, onCommit }: SearchBoxProps) {
 interface EventsToolbarProps {
   filters: EventFilters;
   total?: number;
+  searchBoxKey: number;
+  searchBoxInitial: string;
   onFiltersChange: (patch: Partial<EventFilters>) => void;
+  onClearFilters: () => void;
 }
 
 function EventCount({ total }: { total?: number }) {
@@ -80,10 +65,23 @@ function EventCount({ total }: { total?: number }) {
   );
 }
 
-export function EventsToolbar({ filters, total, onFiltersChange }: EventsToolbarProps) {
+export function EventsToolbar({
+  filters,
+  total,
+  searchBoxKey,
+  searchBoxInitial,
+  onFiltersChange,
+  onClearFilters,
+}: EventsToolbarProps) {
+  const hasFilters = Object.keys(filters).length > 0;
+
   return (
     <div role="search" className="flex flex-wrap items-center gap-2">
-      <SearchBox initialValue={filters.q ?? ""} onCommit={(q) => onFiltersChange({ q })} />
+      <SearchBox
+        key={searchBoxKey}
+        initialValue={searchBoxInitial}
+        onCommit={(q) => onFiltersChange({ q })}
+      />
       <select
         aria-label="Filter by status"
         value={filters.status ?? ""}
@@ -103,12 +101,16 @@ export function EventsToolbar({ filters, total, onFiltersChange }: EventsToolbar
         selected={filters.agent ?? []}
         onChange={(agent) => onFiltersChange({ agent })}
       />
+      {hasFilters && (
+        <button type="button" onClick={onClearFilters} className={control}>
+          Clear filters
+        </button>
+      )}
       <EventCount total={total} />
     </div>
   );
 }
 
-/** Disabled stand-in with the same layout, shown while the explorer streams in. */
 export function EventsToolbarSkeleton() {
   return (
     <div role="search" className="flex flex-wrap items-center gap-2">

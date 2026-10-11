@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ApiError } from "@/lib/api/http";
 import { formatJson, formatTimestamp } from "../format";
 import { eventDetailQueryOptions } from "../queries";
+import { SlowNotice } from "./events-states";
 import type { EventDetail } from "../types";
 
 const buttonClass =
@@ -84,9 +85,12 @@ function DetailContent({ eventId }: { eventId: string }) {
 
   if (isPending) {
     return (
-      <p role="status" className="text-sm text-muted">
-        Loading event…
-      </p>
+      <>
+        <p role="status" className="text-sm text-muted">
+          Loading event…
+        </p>
+        <SlowNotice />
+      </>
     );
   }
 

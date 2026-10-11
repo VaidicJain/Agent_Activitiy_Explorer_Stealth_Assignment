@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { agentsQueryOptions } from "../queries";
 import { controlClass } from "./control-class";
@@ -17,8 +18,36 @@ function summaryLabel(selected: string[]): string {
 /** Multi-select over GET /agents, built on <details> so keyboard and screen readers work natively. */
 export function AgentFilter({ selected, onChange }: AgentFilterProps) {
   const { data: agents, isError, isFetching, refetch } = useQuery(agentsQueryOptions());
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  // A native <details> stays open until toggled: close it on Escape (focus goes back to the
+  // summary) or when the user clicks elsewhere.
+  useEffect(() => {
+    function closeIfDismissed(event: KeyboardEvent | PointerEvent) {
+      const details = detailsRef.current;
+      if (!details?.open) return;
+
+      if (event instanceof KeyboardEvent) {
+        if (event.key !== "Escape") return;
+        details.open = false;
+        details.querySelector("summary")?.focus();
+      } else if (!details.contains(event.target as Node)) {
+        details.open = false;
+      }
+    }
+
+    document.addEventListener("keydown", closeIfDismissed);
+    document.addEventListener("pointerdown", closeIfDismissed);
+    return () => {
+      document.removeEventListener("keydown", closeIfDismissed);
+      document.removeEventListener("pointerdown", closeIfDismissed);
+    };
+  }, []);
 
   if (!agents) {
+    // Keep an active selection (e.g. from a shared link) visible even while the list is unavailable.
+    const active = selected.length > 0 ? `${summaryLabel(selected)} · ` : "";
+
     return isError ? (
       <button
         type="button"
@@ -26,11 +55,11 @@ export function AgentFilter({ selected, onChange }: AgentFilterProps) {
         disabled={isFetching}
         className={controlClass}
       >
-        {isFetching ? "Retrying…" : "Agents unavailable · Retry"}
+        {isFetching ? "Retrying…" : `${active}Agents unavailable · Retry`}
       </button>
     ) : (
       <button type="button" disabled className={controlClass}>
-        Loading agents…
+        {active}Loading agents…
       </button>
     );
   }
@@ -40,7 +69,7 @@ export function AgentFilter({ selected, onChange }: AgentFilterProps) {
   }
 
   return (
-    <details className="relative">
+    <details ref={detailsRef} className="relative">
       <summary className={`${controlClass} flex cursor-pointer list-none items-center`}>
         {summaryLabel(selected)}
       </summary>

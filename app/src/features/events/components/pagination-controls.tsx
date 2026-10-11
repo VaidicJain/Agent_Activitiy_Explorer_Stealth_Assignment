@@ -10,6 +10,7 @@ interface PaginationControlsProps {
   total?: number;
   canGoPrevious: boolean;
   canGoNext: boolean;
+  onFirst: () => void;
   onPrevious: () => void;
   onNext: () => void;
   onPageSizeChange: (pageSize: number) => void;
@@ -22,6 +23,7 @@ export function PaginationControls({
   total,
   canGoPrevious,
   canGoNext,
+  onFirst,
   onPrevious,
   onNext,
   onPageSizeChange,
@@ -55,6 +57,10 @@ export function PaginationControls({
       </p>
 
       <div className="flex gap-2">
+        {/* No "Last": cursors are opaque, so the end can only be reached by paging forward. */}
+        <button type="button" onClick={onFirst} disabled={!canGoPrevious} className={control}>
+          First
+        </button>
         <button type="button" onClick={onPrevious} disabled={!canGoPrevious} className={control}>
           Previous
         </button>

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   changePageSize,
   currentCursor,
+  goToFirstPage,
   goToNextPage,
   goToPreviousPage,
   initialPagination,
@@ -15,7 +16,7 @@ import {
 import { eventsQueryOptions } from "../queries";
 import { closeEvent, openEvent, parseEventsUrl, updateFilters } from "../url-state";
 import { EventDetailPanel } from "./event-detail-panel";
-import { EventsEmpty, EventsError, SlowNotice } from "./events-states";
+import { EventsEmpty, EventsError, RefreshFailed, SlowNotice } from "./events-states";
 import { EventsTable } from "./events-table";
 import { EventsToolbar } from "./events-toolbar";
 import { PaginationControls } from "./pagination-controls";
@@ -31,6 +32,10 @@ export function Explorer() {
   const pagination = paginationForScope(storedPagination, scope);
   if (pagination !== storedPagination) setPagination(pagination);
 
+  // The search box owns its text while typing. Clearing the filters remounts it (new key, empty
+  // text); until then its text comes from the URL it was mounted with.
+  const [searchBox, setSearchBox] = useState<{ key: number; initial?: string }>({ key: 0 });
+
   const { data, error, isFetching, isPlaceholderData, refetch } = useQuery(
     eventsQueryOptions({
       ...filters,
@@ -44,28 +49,55 @@ export function Explorer() {
   const page = isPlaceholderData ? undefined : data;
   const nextCursor = page?.nextCursor ?? null;
   const hasFilters = Object.keys(filters).length > 0;
+  const isLoadingPage = isFetching && (!data || isPlaceholderData);
+  const isFirstPage = pageNumber(pagination) === 1;
+  const canGoPrevious = !isFirstPage && !isPlaceholderData;
+
+  function clearFilters() {
+    updateFilters({ q: undefined, status: undefined, agent: [] });
+    setSearchBox((current) => ({ key: current.key + 1, initial: "" }));
+  }
 
   return (
     <>
-      <EventsToolbar filters={filters} total={data?.total} onFiltersChange={updateFilters} />
+      <EventsToolbar
+        filters={filters}
+        total={data?.total}
+        searchBoxKey={searchBox.key}
+        searchBoxInitial={searchBox.initial ?? filters.q ?? ""}
+        onFiltersChange={updateFilters}
+        onClearFilters={clearFilters}
+      />
 
       {error && !data ? (
         <EventsError error={error} onRetry={() => refetch()} isRetrying={isFetching} />
       ) : data?.items.length === 0 ? (
-        <EventsEmpty hasFilters={hasFilters} />
+        <EventsEmpty
+          hasFilters={hasFilters}
+          onClearFilters={clearFilters}
+          onFirstPage={isFirstPage ? undefined : () => setPagination(goToFirstPage(pagination))}
+        />
       ) : (
         <EventsTable events={data?.items} isStale={isPlaceholderData} onSelect={openEvent} />
       )}
 
-      {isFetching && (!data || isPlaceholderData) && <SlowNotice />}
+      {/* A failed background refresh keeps the cached rows; say so instead of failing silently. */}
+      {error && data && <RefreshFailed onRetry={() => refetch()} isRetrying={isFetching} />}
+
+      {isLoadingPage && <SlowNotice />}
+      {/* Always mounted so screen readers pick up the change when loading starts. */}
+      <p role="status" className="sr-only">
+        {isLoadingPage ? "Loading events…" : ""}
+      </p>
 
       <PaginationControls
         page={pageNumber(pagination)}
         pageSize={pagination.pageSize}
         itemCount={page?.items.length}
         total={page?.total}
-        canGoPrevious={pageNumber(pagination) > 1 && !isPlaceholderData}
+        canGoPrevious={canGoPrevious}
         canGoNext={nextCursor !== null}
+        onFirst={() => setPagination(goToFirstPage(pagination))}
         onPrevious={() => setPagination(goToPreviousPage(pagination))}
         onNext={() => nextCursor && setPagination(goToNextPage(pagination, nextCursor))}
         onPageSizeChange={(pageSize) => setPagination(changePageSize(pagination, pageSize))}
